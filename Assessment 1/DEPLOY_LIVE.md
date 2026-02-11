@@ -24,15 +24,23 @@ git push origin main
 
 ### 2. Streamlit Cloud पर ऐप डिप्लॉय करना
 
+**ध्यान दें:** आप पूरा repo deploy नहीं कर रहे – सिर्फ **Assessment 1** वाला ऐप चलेगा। इसके लिए Repository में **हमेशा पूरे repo का address** देना होता है; ऐप का चुनाव **Main file path** से होता है।
+
 1. ब्राउज़र में जाएं: **https://share.streamlit.io**
 2. **Sign up** करें (GitHub से लॉग इन सबसे आसान है)।
 3. **"New app"** पर क्लिक करें।
-4. सेटिंग्स भरें:
-   - **Repository:** `YourUsername/Agentic-AI` (अपना GitHub username और repo नाम डालें)
+4. सेटिंग्स **बिल्कुल ऐसे** भरें:
+   - **Repository:** सिर्फ repo का नाम (कोई subfolder नहीं):
+     - `Kumkum-Mishra/Agentic-AI`  
+     - या URL हो तो: `https://github.com/Kumkum-Mishra/Agentic-AI`  
+     - ❌ **यह मत डालें:** `.../Agentic-AI/tree/main/Assessment%201` (इससे "This repository does not exist" आता है)
    - **Branch:** `main`
-   - **Main file path:** `Assessment 1/rag_streamlit_app.py`
+   - **Main file path:** ऐप वाली फाइल का path (Assessment 1 के अंदर):
+     - `Assessment 1/rag_streamlit_app.py`  
+     - ❌ `streamlit_app.py` मत लिखें – आपकी फाइल का नाम **rag_streamlit_app.py** है।
    - **Advanced settings** खोलें और:
-     - **Requirements file:** `Assessment 1/requirements.txt`
+     - **Requirements file:** `requirements.txt`  
+       (सिर्फ repo की **जड़** वाली फाइल – Assessment 1 में अब सिर्फ `requirements_streamlit.txt` है, ताकि दो txt से कंफ्यूजन न हो।)
 5. **Deploy** पर क्लिक करें।
 6. कुछ मिनट बाद एक लिंक मिलेगा जैसे:  
    `https://your-app-name.streamlit.app`  
