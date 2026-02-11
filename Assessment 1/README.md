@@ -420,6 +420,13 @@ streamlit run app_simple.py
 ```bash
 # Push to GitHub, then link at share.streamlit.io
 ```
+## 🌐 Live Demo
+
+**Try the live application here:**  
+🔗 [RAG System - Live Streamlit App](https://agentic-ai-wi3a4vkowughecg7verxkc.streamlit.app/)
+
+---
+
 ## 📝 License
 
 This project is provided as-is for educational purposes.
