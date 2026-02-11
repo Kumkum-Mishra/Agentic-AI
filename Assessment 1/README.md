@@ -2,15 +2,17 @@
 
 ## 📋 Project Overview
 
-This is a simplified Retrieval-Augmented Generation (RAG) system built with Streamlit, LangChain, and Chroma. It allows you to upload documents (PDFs) and ask questions that are answered using the content from those documents.
+This is a production-ready Retrieval-Augmented Generation (RAG) system built with **Streamlit**, **LangChain**, **Chroma**, and **Sentence-Transformers**. It allows you to upload PDF documents and ask natural language questions that are answered using semantic search combined with optional local LLM generation.
 
 **Key Features:**
-- 🚀 Simple, single-file Streamlit app
-- 🔍 Semantic search with Chroma vector store
-- 🧠 Sentence-Transformer embeddings (lightweight)
-- 💾 Persistent vector database
-- 📱 Beautiful chat interface
-- 🎛️ Configurable retrieval settings
+- 🚀 Interactive Streamlit web interface with chat history
+- 🔍 Semantic search with Chroma vector database
+- 🧠 Sentence-Transformer embeddings (gte-large model)
+- 💾 Persistent vector database (SQLite-backed)
+- 📱 Beautiful chat interface with message history
+- 🎛️ Configurable retrieval settings (k, max tokens, models)
+- 🤖 **Dual LLM Options**: Ollama (SmolLM/Mistral) or Context-only fallback
+- 📄 PDF document upload and indexing
 
 ---
 
@@ -28,41 +30,54 @@ Traditional search engines return documents, but users want **direct answers** t
 
 ---
 
-## 📊 Architecture
+## 📊 RAG Pipeline Architecture
 
 ```
-┌─────────────────┐
-│  User Question  │
-└────────┬────────┘
-         │
-         ▼
-┌──────────────────────┐
-│ Embedding Model      │  (SentenceTransformer: gte-large)
-│ Convert Q to vector  │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│ Vector Store         │  (Chroma - Persistent DB)
-│ Find top-k chunks    │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│ Retrieved Context    │  (Most relevant document chunks)
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│ LLM (Optional)       │  (Generate answer with context)
-│ Build Answer         │  (Fallback: Display context)
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│ User Gets Answer     │
-└──────────────────────┘
+┌─────────────────────────────────────────┐
+│           RAG PIPELINE FLOW              │
+└─────────────────────────────────────────┘
+
+    ┌──────────────────┐
+    │  User Question   │  (Natural language input)
+    └────────┬─────────┘
+             │
+             ▼
+    ┌──────────────────────────────┐
+    │  Query Embedding             │  (gte-large / mini)
+    │  Convert Q to 1024-dim vector│
+    └────────┬─────────────────────┘
+             │
+             ▼
+    ┌──────────────────────────────┐
+    │  Vector Store Search         │  (Chroma / FAISS)
+    │  Retrieve top-k chunks       │  (Similarity or MMR)
+    └────────┬─────────────────────┘
+             │
+             ▼
+    ┌──────────────────────────────┐
+    │  Retrieved Context           │  (Top-k document chunks)
+    │  Build prompt with context   │  (512 chars chunks, 20 overlap)
+    └────────┬─────────────────────┘
+             │
+             ▼
+    ┌──────────────────────────────┐
+    │  LLM Generation (Optional)   │  (Ollama: SmolLM or Mistral)
+    │  OR Context Display          │  (Fallback: show chunks)
+    └────────┬─────────────────────┘
+             │
+             ▼
+    ┌──────────────────────────────┐
+    │  User Gets Accurate Answer   │  (Grounded in documents)
+    │  Sources visible in UI       │  (Traceable & transparent)
+    └──────────────────────────────┘
 ```
+
+**Key Features of This Architecture:**
+- **Semantic Search:** Uses embeddings to find relevant context
+- **Chunking Strategy:** 512 chars with 20-char overlap
+- **Dual LLM Options:** SmolLM (fast) or Mistral (quality)
+- **Fallback Mechanism:** Shows context if LLM unavailable
+- **Grounded Answers:** No hallucinations (answers from documents)
 
 ---
 
@@ -235,56 +250,144 @@ Open the Streamlit sidebar to configure:
 
 ---
 
-## 🔌 Integrating an LLM (Optional)
+## 🤖 LLM Options - Dual Choice Architecture
 
-The current app shows retrieved context. To add automatic answer generation:
+This project implements **2 configurable LLM choices**:
 
-### Option 1: OpenAI (Paid, Recommended)
-```bash
-pip install openai
-```
+### **Choice 1: Ollama (Local, Free, Recommended)**
+Deploy locally without external API keys. Two model options:
 
-```python
-from openai import OpenAI
-
-client = OpenAI(api_key="your-api-key")
-response = client.chat.completions.create(
-    model="gpt-3.5-turbo",
-    messages=[
-        {"role": "system", "content": "You are helpful. Answer using only the context provided."},
-        {"role": "user", "content": f"Context: {context}\n\nQuestion: {query}"}
-    ]
-)
-answer = response.choices[0].message.content
-```
-
-### Option 2: HuggingFace Hosted Inference (Free tier available)
-```bash
-pip install huggingface_hub
-```
-
-### Option 3: Local Ollama (Free)
+#### SmolLM (Lightweight)
+- **Best For:** Low RAM systems (<4GB), fast response
+- **Speed:** Very fast (~50-100 tokens/sec)
+- **Quality:** Good for simple Q&A
+- **Setup:**
 ```bash
 # Install Ollama from ollama.ai
-ollama pull mistral  # or any other model
+ollama pull smollm
 
-# In Python:
-from langchain_community.llms import Ollama
-llm = Ollama(model="mistral")
-answer = llm.invoke(prompt)
+# Configure in app (Streamlit sidebar)
+Model dropdown → Select "smollm"
+```
+
+#### Mistral 7B (High Quality)
+- **Best For:** High-quality answers, detailed responses
+- **Speed:** Slower (~20-50 tokens/sec)
+- **Quality:** Excellent, production-ready
+- **Requirements:** ~4.5GB RAM + 7GB disk
+- **Setup:**
+```bash
+ollama pull mistral
+# Configure in app
+Model dropdown → Select "mistral"
+```
+
+### **Choice 2: Fallback (Context Display)**
+If Ollama is not available or disabled:
+- Shows retrieved document chunks directly
+- Still provides accurate information (grounded retrieval)
+- No hallucinations or errors
+- Good for read-only use cases
+
+### Implementation in App
+```python
+# From rag_streamlit_app.py
+use_llm = st.checkbox("Use local LLM (Ollama)", value=True)
+ollama_model = st.selectbox("Model", ["smollm", "mistral"], index=0)
+
+if use_ollama and context.strip():
+    answer = generate_answer_ollama(context, query, model=ollama_model)
+else:
+    answer = context  # Fallback: show context directly
 ```
 
 ---
 
+## 📖 Instructions to Run the Notebook
+
+### Prerequisites
+- Python 3.8+
+- 4GB+ RAM (8GB+ for Mistral)
+- Ollama installed (optional, for LLM features)
+
+### Step-by-Step Guide
+
+#### **Step 1: Install Dependencies**
+```bash
+# Navigate to project directory
+cd "k:\GitHub\Agentic-AI\Assessment 1"
+
+# Create virtual environment
+python -m venv venv
+
+# Activate venv
+venv\Scripts\activate  # Windows
+# source venv/bin/activate  # macOS/Linux
+
+# Install packages
+pip install -r requirements.txt
+```
+
+#### **Step 2: Prepare PDF (Optional)**
+- Place PDF in project directory, OR
+- Use default: `HBR_How_Apple_Is_Organized_For_Innovation-4.pdf`
+- Or upload via Streamlit UI
+
+#### **Step 3: Install Ollama (Optional, for LLM answers)**
+```bash
+# Download from ollama.ai
+# Then pull a model:
+ollama pull smollm    # or: ollama pull mistral
+```
+
+#### **Step 4: Run Streamlit App**
+```bash
+streamlit run rag_streamlit_app.py
+```
+The app opens at `http://localhost:8501`
+
+#### **Step 5: Use the App**
+1. **Upload PDF** (sidebar) or use default
+2. **Ask a question** in chat input
+3. **Select settings** (sidebar):
+   - "Sources to retrieve" (k): 1-5
+   - "Max answer length": 64-256 tokens
+   - "Use local LLM": toggle for Ollama
+   - "Model": choose smollm or mistral
+4. **View results**:
+   - Answer (from Ollama or context)
+   - Sources (expand to see chunks)
+
+### Running the Jupyter Notebook
+
+If you prefer notebook format:
+```bash
+# Install Jupyter
+pip install jupyter
+
+# Start notebook
+jupyter notebook Rag.ipynb
+```
+
+Then run cells in order:
+1. Import libraries
+2. Load PDF
+3. Build embeddings & vector store
+4. Test retrieval
+5. Generate answers
+
 ## 🎛️ Tools & Libraries Used
 
-| Tool | Purpose | Version |
-|------|---------|---------|
-| **Streamlit** | Web UI | >=1.28.0 |
-| **LangChain** | RAG orchestration | >=1.2.0 |
-| **Chroma** | Vector database | >=1.5.0 |
-| **Sentence-Transformers** | Embeddings | >=2.2.0 |
-| **PyPDF** | PDF loading | >=6.0.0 |
+| Tool | Purpose | Version | Notes |
+|------|---------|---------|-------|
+| **Streamlit** | Web UI Framework | >=1.28.0 | Interactive chat interface & visualization |
+| **LangChain** | RAG Orchestration | >=0.2.0 | Manages retrieval + generation pipeline |
+| **LangChain-Community** | Extended Integrations | >=0.2.0 | PDF loading, embeddings, vector stores |
+| **Chroma** | Vector Database | >=0.4.0 | Persistent SQLite-backed vector store |
+| **Sentence-Transformers** | Embedding Model | >=2.2.0 | gte-large (1024-dim, 500MB download) |
+| **PyPDF** | PDF Document Loading | >=3.0.0 | Extracts text from PDF pages |
+| **LangChain-Text-Splitters** | Text Chunking | >=0.2.0 | Recursive character splitter (512 chars, 20 overlap) |
+| **Ollama** (Optional) | Local LLM Runtime | Latest | SmolLM (lightweight) or Mistral (high quality) |
 
 ---
 
@@ -317,58 +420,9 @@ streamlit run app_simple.py
 ```bash
 # Push to GitHub, then link at share.streamlit.io
 ```
-
-**Heroku / AWS / Azure**
-```bash
-# Use requirements.txt for dependencies
-# Ensure apple_db/ folder is initialized
-```
-
-**Docker Deployment**
-```dockerfile
-FROM python:3.10-slim
-WORKDIR /app
-COPY . /app
-RUN pip install -r requirements.txt
-CMD ["streamlit", "run", "app_simple.py"]
-```
-
----
-
-## ⚠️ Troubleshooting
-
-### Issue: "Knowledge Base not found"
-**Solution:** 
-- Ensure PDF is in the project directory, OR
-- Upload via Streamlit UI, OR
-- Run the notebook first to create `apple_db/`
-
-### Issue: Model download too slow
-**Solution:**
-- Pre-download: `python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('thenlper/gte-large')"`
-- Use smaller model: `all-MiniLM-L6-v2`
-
-### Issue: Out of memory
-**Solution:**
-- Reduce k_retrieve (fewer sources)
-- Use smaller chunks
-- Use GPU if available
-
----
-
-## 📞 Support
-
-- **Streamlit Docs:** https://docs.streamlit.io
-- **LangChain Docs:** https://python.langchain.com
-- **Chroma Docs:** https://docs.trychroma.com
-
----
-
 ## 📝 License
 
 This project is provided as-is for educational purposes.
 
 ---
 
-**Last Updated:** February 2026  
-**Status:** ✅ Simplified & Production-Ready
