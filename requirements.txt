@@ -8,3 +8,4 @@ sentence-transformers>=2.2.0
 pypdf>=6.0.0
 llama-cpp-python>=0.2.0
 huggingface_hub>=0.20.0
+tf-keras
