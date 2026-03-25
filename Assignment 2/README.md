@@ -122,12 +122,6 @@ The agent generates a structured report like:
 
 ---
 
-## Security Note
-
-Do NOT expose your API keys in code. Always use environment variables.
-
----
-
 ## Conclusion
 
 This project demonstrates how AI agents can automate research tasks by combining:
