@@ -8,8 +8,10 @@ For local LLM: Install Ollama from ollama.ai, then run: ollama pull smollm
 """
 
 import os
+import json
 import streamlit as st
 from pathlib import Path
+from urllib import request, error
 
 os.environ.setdefault("TRANSFORMERS_NO_TF", "1")
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
@@ -40,11 +42,10 @@ def get_embedding_model():
 
 
 def ollama_available():
-    """Check if Ollama is running and model is available."""
+    """Check if Ollama API server is reachable."""
     try:
-        import ollama
-        ollama.list()
-        return True
+        with request.urlopen("http://127.0.0.1:11434/api/tags", timeout=2) as resp:
+            return resp.status == 200
     except Exception:
         return False
 
@@ -56,11 +57,42 @@ def generate_answer_ollama(context: str, question: str, model: str, max_tokens=1
     prompt = QNA_TEMPLATE.format(context=context, question=question)
     full_prompt = QNA_SYSTEM + "\n\n" + prompt
     try:
-        import ollama
-        r = ollama.generate(model=model, prompt=full_prompt, options={"num_predict": max_tokens})
-        return (r.get("response", "") or "").strip()
+        payload = {
+            "model": model,
+            "prompt": full_prompt,
+            "stream": False,
+            "options": {"num_predict": max_tokens},
+        }
+        req = request.Request(
+            "http://127.0.0.1:11434/api/generate",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with request.urlopen(req, timeout=90) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return (data.get("response", "") or "").strip()
+    except error.HTTPError as e:
+        return f"LLM error (HTTP {e.code}): {e.reason}"
     except Exception as e:
         return f"LLM error: {e}"
+
+
+def fallback_answer_from_context(context: str, max_chars: int = 700):
+    """Return a concise grounded fallback instead of dumping raw chunks."""
+    clean = " ".join(context.split())
+    if not clean:
+        return "I could not find relevant text in the indexed document."
+
+    # Keep fallback readable and brief.
+    clipped = clean[:max_chars]
+    if len(clean) > max_chars:
+        clipped += "..."
+
+    return (
+        "Ollama is unavailable right now, so here is the most relevant text from your document:\n\n"
+        f"{clipped}"
+    )
 
 
 def get_vectorstore(_embedding_model, persist_dir=str(OUT_DIR), document_chunks=None):
@@ -110,12 +142,13 @@ def main():
         max_tokens = st.slider("Max answer length (tokens)", 64, 256, 100, help="Lower = faster")
         use_llm = st.checkbox("Use local LLM (Ollama)", value=True)
         ollama_model = st.selectbox("Model", OLLAMA_MODELS, index=0, help="Smollm = low RAM; Mistral needs ~4.5GB")
+        ollama_ok = ollama_available()
         if use_llm:
-            ollama_ok = ollama_available()
             if ollama_ok:
                 st.caption(f"Ollama ready. Pull if needed: ollama pull {ollama_model}")
             else:
-                st.caption("Install Ollama, then: ollama pull smollm")
+                st.warning("Ollama not reachable at http://127.0.0.1:11434. Start it with: ollama serve")
+                st.caption("Model install example: ollama pull smollm")
 
     # Load embedding model
     try:
@@ -124,7 +157,7 @@ def main():
         st.error(f"Embedding model failed: {e}")
         st.stop()
 
-    use_ollama = use_llm and ollama_available()
+    use_ollama = use_llm and ollama_ok
 
     # Vector store
     document_chunks = None
@@ -165,8 +198,10 @@ def main():
         if use_ollama and context.strip():
             with st.spinner("Generating answer..."):
                 answer = generate_answer_ollama(context, query, model=ollama_model, max_tokens=max_tokens)
+                if answer.startswith("LLM error:") or answer.startswith("LLM error (HTTP"):
+                    answer = fallback_answer_from_context(context)
         else:
-            answer = context.strip() if context else "No relevant text found."
+            answer = fallback_answer_from_context(context)
 
         st.session_state.messages.append({"role": "assistant", "content": answer})
         with st.chat_message("assistant"):

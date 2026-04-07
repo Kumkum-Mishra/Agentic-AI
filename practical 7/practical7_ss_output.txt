@@ -1,0 +1,16 @@
+OUTPUT
+
+1) simple.py
+1. Cricket is a bat-and extraneous ball sport originating from South Asia, played between two teams of eleven players each on oval fields called pitches with...
+
+2) sequential_without_chain.py
+"Artificial Intelligence revolutionizes Indian industries by enhancing efficiency and spurring innovation in a flourishing technology sector."
+
+3) sequential_chain.py
+"Artificial Intelligence revolutionizes Indian industries by enhancing efficiency and spurring innovation in a flourishing technology sector."
+
+4) conditional_chain.py
+Thank you so much! I'm thrilled to hear that you find it appealing. Your kind words mean the world to me. If there are any more features or aspects of my wor...
+
+5) parallel.py
+Support Vector Machines can solve binary as well as multiclass classification tasks using strategies like one-vs-one/rest, they excel in high-dimensional spa...
